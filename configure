@@ -1,0 +1,16 @@
+#!/bin/env python2
+
+import argparse
+
+parser = argparse.ArgumentParser(description='Configure typical cmake project')
+parser.add_argument('--compiler', help='compiler prefix')
+parser.add_argument('--self-update', action='store_true', help='update this script locally')
+
+args = parser.parse_args()
+if args.self_update:
+	import sys, urllib2
+	response = urllib2.urlopen('https://raw.githubusercontent.com/whoozle/typical-cmake-configure/master/configure')
+	html = response.read()
+	with open(sys.argv[0], "w") as f:
+		f.write(html)
+	sys.exit()
