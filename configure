@@ -4,7 +4,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Configure typical cmake project')
 parser.add_argument('--cmake', default='cmake', help='cmake binary')
-parser.add_argument('--generator', '-G', default='make', help='cmake generator')
+parser.add_argument('--generator', '-G', default='Unix Makefiles', help='cmake generator')
 parser.add_argument('--compiler', default='gcc', help='compiler')
 parser.add_argument('--self-update', action='store_true', help='update this script locally')
 args = parser.parse_args()
