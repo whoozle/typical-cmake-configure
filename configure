@@ -3,10 +3,11 @@
 import argparse
 
 parser = argparse.ArgumentParser(description='Configure typical cmake project')
-parser.add_argument('--compiler', help='compiler prefix')
+parser.add_argument('--cmake', default='cmake', help='cmake binary')
+parser.add_argument('--compiler', default='gcc', help='compiler')
 parser.add_argument('--self-update', action='store_true', help='update this script locally')
-
 args = parser.parse_args()
+
 if args.self_update:
 	import sys, urllib2
 	response = urllib2.urlopen('https://raw.githubusercontent.com/whoozle/typical-cmake-configure/master/configure')
@@ -14,3 +15,22 @@ if args.self_update:
 	with open(sys.argv[0], "w") as f:
 		f.write(html)
 	sys.exit()
+
+import shutil
+import os
+import subprocess
+
+build_dir = 'build' #fixme: add target?
+if os.path.exists(build_dir):
+	shutil.rmtree(build_dir)
+os.mkdir(build_dir)
+
+cxxcompiler = (args.compiler[:-2] + "++") if args.compiler.endswith("cc") else (args.compiler + "++")
+
+root_dir = os.getcwd()
+rel_path = os.path.relpath(root_dir, build_dir)
+cmake_args = [args.cmake, rel_path,
+	'-DCMAKE_C_COMPILER=%s' %args.compiler,
+	'-DCMAKE_CXX_COMPILER=%s' %cxxcompiler,
+]
+subprocess.call(cmake_args, cwd = build_dir)
