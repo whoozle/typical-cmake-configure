@@ -4,6 +4,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Configure typical cmake project')
 parser.add_argument('--cmake', default='cmake', help='cmake binary')
+parser.add_argument('--generator', '-G', default='make', help='cmake generator')
 parser.add_argument('--compiler', default='gcc', help='compiler')
 parser.add_argument('--self-update', action='store_true', help='update this script locally')
 args = parser.parse_args()
@@ -30,6 +31,7 @@ cxxcompiler = (args.compiler[:-2] + "++") if args.compiler.endswith("cc") else (
 root_dir = os.getcwd()
 rel_path = os.path.relpath(root_dir, build_dir)
 cmake_args = [args.cmake, rel_path,
+	'-G', args.generator,
 	'-DCMAKE_C_COMPILER=%s' %args.compiler,
 	'-DCMAKE_CXX_COMPILER=%s' %cxxcompiler,
 ]
