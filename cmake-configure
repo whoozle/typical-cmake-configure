@@ -11,7 +11,7 @@ args = parser.parse_args()
 
 if args.self_update:
 	import sys, urllib2
-	response = urllib2.urlopen('https://raw.githubusercontent.com/whoozle/typical-cmake-configure/master/configure')
+	response = urllib2.urlopen('https://raw.githubusercontent.com/whoozle/typical-cmake-configure/master/cmake-configure')
 	html = response.read()
 	with open(sys.argv[0], "w") as f:
 		f.write(html)
