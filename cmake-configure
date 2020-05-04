@@ -1,38 +1,115 @@
-#!/bin/env python2
+#!/bin/env python3
 
 import argparse
-
-parser = argparse.ArgumentParser(description='Configure typical cmake project')
-parser.add_argument('--cmake', default='cmake', help='cmake binary')
-parser.add_argument('--generator', '-G', default='Unix Makefiles', help='cmake generator')
-parser.add_argument('--compiler', default='gcc', help='compiler')
-parser.add_argument('--self-update', action='store_true', help='update this script locally')
-args = parser.parse_args()
-
-if args.self_update:
-	import sys, urllib2
-	response = urllib2.urlopen('https://raw.githubusercontent.com/whoozle/typical-cmake-configure/master/cmake-configure')
-	html = response.read()
-	with open(sys.argv[0], "w") as f:
-		f.write(html)
-	sys.exit()
-
 import shutil
 import os
 import subprocess
+import sys
+from urllib.request import urlopen
+import logging
+from shlex import quote
 
-build_dir = 'build' #fixme: add target?
-if os.path.exists(build_dir):
-	shutil.rmtree(build_dir)
-os.mkdir(build_dir)
+logger = logging.getLogger('cmake-conf')
 
-cxxcompiler = (args.compiler[:-2] + "++") if args.compiler.endswith("cc") else (args.compiler + "++")
+parser = argparse.ArgumentParser(description='Configure typical cmake project')
+
+parser.add_argument('--cmake', default='cmake', help='cmake binary')
+parser.add_argument('--generator', '-G', default='Ninja', help='cmake generator')
+parser.add_argument('--self-update', action='store_true', help='update this script locally')
+parser.add_argument('sources', help='top-level sources dir')
+parser.add_argument('--list', '-l', action='store_true', help='list toolchains (looking in PATH)')
+parser.add_argument('--filter', '-f', help='use first toolchain filtered')
+parser.add_argument('--prefix', '-p', help='install prefix')
+parser.add_argument('--verbose', '-v', action='store_true', help='output debug messages')
+parser.add_argument('--no-cxx', '-X', action='store_true', help='allow no cxx')
+
+args = parser.parse_args()
+
+logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+
+class Toolchain:
+	def __init__(self, prefix, cc, cxx):
+		self.prefix, self.cc, self.cxx = os.path.basename(prefix), cc, cxx
+
+	def __repr__(self):
+		return "{prefix: %s, cc: %s, cxx: %s}" %(self.prefix, self.cc, self.cxx)
+
+	@staticmethod
+	def probe(cc, cxx_needed):
+		prefix_list = [('gcc', 'g++'), ('clang', 'clang++')]
+		for ccp, cxxp in prefix_list:
+			pos = cc.find(ccp)
+			if pos < 0:
+				continue
+
+			prefix = cc[:pos]
+			cxx = cc.replace(ccp, cxxp)
+
+			if os.path.exists(cxx):
+				return Toolchain(prefix, cc, cxx)
+			elif not cxx_needed:
+				return Toolchain(prefix, cc, None)
+
+toolchains = {}
+
+#collecting toolchains
+for basedir in os.environ.get('PATH', '').split(os.pathsep):
+	try:
+		#logger.debug('scanning %s', basedir)
+		basedir = os.path.expanduser(basedir)
+		for filename in os.listdir(basedir):
+			toolchain = Toolchain.probe(os.path.join(basedir, filename), not args.no_cxx)
+			if toolchain is not None:
+				logger.debug('found toolchain with prefix %s', toolchain.prefix)
+				toolchains[toolchain.prefix] = toolchain
+	except Exception as ex:
+		logger.debug('exception while scanning %s: %s', basedir, ex)
+
+if args.self_update:
+	with urlopen('https://raw.githubusercontent.com/whoozle/typical-cmake-configure/master/cmake-configure') as req:
+		html = req.read()
+		with open(sys.argv[0], "w") as f:
+			f.write(html)
+	sys.exit()
+
+if args.list:
+	for prefix, toolchain in toolchains.items():
+		print(toolchain)
+	sys.exit(0)
+
+if args.filter:
+	t = {}
+	for prefix, toolchain in toolchains.items():
+		if args.filter in prefix:
+			t[prefix] = toolchain
+	toolchains = t
+
+	if not toolchains.keys():
+		print("no toolchains found matching %s" %args.platform, file = sys.stderr)
+		sys.exit(1)
+
+for toolchain in sorted(toolchains.values(), key=lambda item: len(item.prefix)):
+	break
+
+logger.info('using toolchain: %s', toolchain)
+logger.info('using %s as source dir', args.sources)
+
+vars = {
+	'CMAKE_EXPORT_COMPILE_COMMANDS': 'YES',
+	'CMAKE_C_COMPILER': toolchain.cc,
+	'CMAKE_CXX_COMPILER': toolchain.cxx,
+}
+
+if args.prefix:
+	vars['CMAKE_INSTALL_PREFIX'] = args.prefix
 
 root_dir = os.getcwd()
-rel_path = os.path.relpath(root_dir, build_dir)
-cmake_args = [args.cmake, rel_path,
+cmake_args = [args.cmake, args.sources,
 	'-G', args.generator,
-	'-DCMAKE_C_COMPILER=%s' %args.compiler,
-	'-DCMAKE_CXX_COMPILER=%s' %cxxcompiler,
 ]
-subprocess.call(cmake_args, cwd = build_dir)
+
+for name, value in vars.items():
+	cmake_args.append('-D%s=%s' %(name, quote(value)))
+
+logger.debug('cmake arguments %s' %cmake_args)
+subprocess.call(cmake_args, cwd = root_dir)
