@@ -72,11 +72,6 @@ if args.self_update:
 			f.write(html)
 	sys.exit()
 
-if args.list:
-	for prefix, toolchain in toolchains.items():
-		print(toolchain)
-	sys.exit(0)
-
 if args.filter:
 	t = {}
 	for prefix, toolchain in toolchains.items():
@@ -87,6 +82,11 @@ if args.filter:
 	if not toolchains.keys():
 		print("no toolchains found matching %s" %args.platform, file = sys.stderr)
 		sys.exit(1)
+
+if args.list:
+	for prefix, toolchain in toolchains.items():
+		print(toolchain)
+	sys.exit(0)
 
 for toolchain in sorted(toolchains.values(), key=lambda item: len(item.prefix)):
 	break
